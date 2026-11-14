@@ -463,7 +463,9 @@ async function takeTitle($: EngineInterface, title: unknown): Promise<void> {
 
 /* ---------------- the hooks ---------------- */
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  // userConfig `mostrarSempre`: the band stays on screen even with no subagent, and keeps the finished ones.
+  const isAlways = options?.mostrarSempre === true || options?.mostrarSempre === 'true'
   on('session.start', async ($, e, next) => {
     await stamp($)
     // A reload keeps $.state: the same session keeps its own entry.
@@ -707,10 +709,10 @@ export const register: Register = on => {
     if (e.props.hasSurvey) return next(e)
     const list = await read($, crew)
     const now = await drawnAt($)
-    const rows = bandRows(list, now)
+    const rows = isAlways ? list : bandRows(list, now)
     const live = await read($, peers)
     const others = live.filter(p => isShown(p, now))
-    if (rows.length === 0 && others.length === 0) return next(e)
+    if (!isAlways && rows.length === 0 && others.length === 0) return next(e)
     const me = await read($, self)
     // Numbered over every live session, shown or not, so a stopped one leaving renames no other.
     const names = sessionNames(me === null ? live : [...live, me])
@@ -744,7 +746,9 @@ export const register: Register = on => {
               <Text color="subtle" wrap="truncate-end">
                 {rows.length > 0
                   ? `Subagentes · ${ativos(active)} · ${formatTokens(list.reduce((s, m) => s + m.tokens, 0))} tokens`
-                  : sessoesLabel(others.length, myName)}
+                  : isAlways
+                    ? 'Subagentes · nenhum'
+                    : sessoesLabel(others.length, myName)}
               </Text>
             </Box>
             <Box flexShrink={0} marginLeft={1}>{foldBand}</Box>
@@ -785,8 +789,8 @@ export const register: Register = on => {
                 </Box>
                 {/* Texto de um nível só e cortado: o Text aninhado quebrava a faixa em duas linhas. */}
                 <Box flexGrow={1} flexShrink={1} marginLeft={1} overflow="hidden">
-                  <Text color={m.status === 'working' ? 'subtle' : st.color} wrap="truncate-end">
-                    {cut(activity(m) || st.label, 32)}
+                  <Text color={m.endedAt !== null && now - m.endedAt >= BAND_LINGER_MS ? 'inactive' : m.status === 'working' ? 'subtle' : st.color} wrap="truncate-end">
+                    {m.endedAt !== null && now - m.endedAt >= BAND_LINGER_MS ? st.label : cut(activity(m) || st.label, 32)}
                   </Text>
                 </Box>
                 {m.endedAt === null && (
@@ -799,7 +803,7 @@ export const register: Register = on => {
           })}
           {!isFolded && others.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
-              {rows.length > 0 && <Text color="subtle">{sessoesLabel(others.length, myName)}</Text>}
+              {(rows.length > 0 || isAlways) && <Text color="subtle">{sessoesLabel(others.length, myName)}</Text>}
               {others.map((p, i) => {
                 const kind = poseOf(p)
                 const shown = listProgress(p.todos ?? null)
