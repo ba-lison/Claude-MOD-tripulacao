@@ -80,7 +80,7 @@ test('a tool call reads as what it points at', () => {
   expect(targetOf('WebFetch', { url: 'https://example.com/x' })).toBe('example.com')
 })
 
-test('with no subagent, the band draws nothing of its own', async ($, on) => {
+test('with no subagent, the band draws nothing of its own', { options: { mostrarSempre: false } }, async ($, on) => {
   engine(on)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ ...BAND, surface })
@@ -201,7 +201,7 @@ test('the task bar follows its TaskCreate and TaskUpdate tasks', async ($, on) =
   expect(await shows($, /^50%$/)).toBe(true)
 })
 
-test('a tool call marks the subagent working, and its answer marks it done', async ($, on) => {
+test('a tool call marks the subagent working, and its answer marks it done', { options: { mostrarSempre: false } }, async ($, on) => {
   const clock = engine(on)
   on('tool.call', () => ({ result: 'ok' }))
   on('turn.complete', () => ({ text: '' }))
@@ -254,4 +254,13 @@ test('a failure in the bookkeeping never holds up the tool', async ($, on) => {
   // No subagent with this id: the hook has nothing to patch, and the call still goes through.
   const result = await $.tool.call(inAgent({ tool: 'Read', tool_use_id: 'r1', file_path: 'x.ts' } as const, 'ghost'))
   expect(result.result).toBe('ok')
+})
+
+test('mostrarSempre ligada: a faixa fica com "nenhum" e guarda o subagente concluído, apagado', async ($, on) => {
+  engine(on)
+  for (const surface of ['terminal', 'desktop'] as const) {
+    const ui = await $.ui.mount({ ...BAND, surface })
+    expect(await ui.find({ type: 'Text', text: /Subagentes · nenhum/ })).toBeDefined()
+    await ui.unmount()
+  }
 })
